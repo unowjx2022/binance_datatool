@@ -133,7 +133,7 @@ class SimonsLogger:
 # ====================================================================================================
 def get_logger(name=None) -> logging.Logger:
     if name is None:
-        name = 'log'
+        name = 'BinanceDataTool'
     return SimonsLogger(name).logger
 
 
@@ -166,7 +166,7 @@ def divider(name='', sep='=', logger_=None, display_time=True) -> None:
     time.sleep(0.05)
 
 
-logger = get_logger()
+logger = get_logger('binance_datatool')
 
 # 直接运行，查看使用案例
 if __name__ == '__main__':

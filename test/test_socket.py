@@ -1,11 +1,10 @@
 import asyncio
-import logging
 from datetime import datetime
 
-from api.binance.binance_market_ws import get_usdt_futures_kline_socket, get_coin_futures_kline_socket
+from api.binance.binance_market_ws import (get_coin_futures_kline_socket, get_usdt_futures_kline_socket)
+from bmac.filter_symbol import TradingUsdtFuturesFilter
 from fetcher import BinanceFetcher
-from util import create_aiohttp_session
-from bmac.filter_symbol import TradingCoinPerpFilter, TradingUsdtPerpFilter
+from util import create_aiohttp_session, get_logger
 
 TRADE_TYPE_MAP = {
     'usdt_futures': get_usdt_futures_kline_socket,
@@ -34,7 +33,7 @@ class CandleListener:
                     try:
                         res = await socket_conn.recv()
                     except asyncio.TimeoutError:
-                        logging.debug('Recv candle ws timeout')
+                        get_logger().error('Recv candle ws timeout, will reconnect')
                     if 'data' not in res:
                         continue
                     data = res['data']
@@ -69,7 +68,7 @@ async def test_socket():
     trade_type = 'usdt_futures'
     n_groups = 8
     time_interval = '1m'
-    sym_filter = TradingUsdtPerpFilter()
+    sym_filter = TradingUsdtFuturesFilter()
     async with create_aiohttp_session(3) as session:
         fetcher = BinanceFetcher(trade_type, session)
         exginfo = await fetcher.get_exchange_info()

@@ -125,7 +125,6 @@ async def dispatcher(handler: BmacHandler, fetcher: BinanceFetcher, senders: dic
 
 async def update_exginfo(handler: BmacHandler, fetcher: BinanceFetcher, senders: dict[str, DingDingSender],
                          listeners: list[CandleListener], run_time):
-    symbol_filter = handler.symbol_filter
     candle_mgr = handler.candle_mgr
     exginfo_mgr = handler.exginfo_mgr
 
@@ -133,7 +132,9 @@ async def update_exginfo(handler: BmacHandler, fetcher: BinanceFetcher, senders:
     syminfo = await fetcher.get_exchange_info()
 
     # 1. 根据 symbol_filter 过滤 symbol
-    symbols_trading = symbol_filter(syminfo)
+    symbols_trading = handler.symbol_filter(syminfo)
+    if handler.keep_symbols is not None:
+        symbols_trading = [x for x in symbols_trading if x in handler.keep_symbols]
     symbols_last = candle_mgr.get_all_symbols()
     notrading_symbols = set(symbols_last) - set(symbols_trading)
     new_symbols = set(symbols_trading) - set(symbols_last)
@@ -203,11 +204,15 @@ async def fetch_recent_closed_candle(handler: BmacHandler, fetcher: BinanceFetch
     interval = handler.interval
     is_closed = False
     while True:
-        df = await fetcher.get_candle(symbol, interval, limit=99)
+        try:
+            df = await fetcher.get_candle(symbol, interval, limit=99)
 
-        if df['candle_begin_time'].max() >= run_time:
-            is_closed = True
-            break
+            if df['candle_begin_time'].max() >= run_time:
+                is_closed = True
+                break
+        except BinanceAPIException as e:
+            if e.code in err_filter_dict:
+                break
 
         if now_time() - run_time > pd.Timedelta(seconds=expire_sec):
             break
@@ -236,7 +241,7 @@ async def restful_candle_fetcher(handler: BmacHandler, fetcher: BinanceFetcher, 
 
 
 def create_listeners(handler: BmacHandler, symbols, main_que) -> list[CandleListener]:
-    trade_type = handler.trade_type
+    trade_type = handler.api_trade_type
     time_interval = handler.interval
     n_listeners = handler.num_socket_listeners
 
@@ -287,8 +292,8 @@ async def main(base_dir):
     divider('Start Bmac V2', logger_=handler.logger)
 
     # 输出核心配置
-    handler.logger.info('Params: interval=%s, type=%s, num_candles=%r, funding_rate=%r', handler.interval,
-                        handler.trade_type, handler.num_candles, handler.fetch_funding_rate)
+    handler.logger.info('interval=%s, type=%s, num_candles=%r, funding_rate=%r, keep_symbols=%r', handler.interval,
+                        handler.trade_type, handler.num_candles, handler.fetch_funding_rate, handler.keep_symbols)
 
     while True:
         try:
